@@ -38,6 +38,6 @@ def eeg_batch_frequencies(batch: EEGBatch, sampling_rate=1) -> EEGFrequencies:
     frequency_responses = torch.zeros((n_sensors, len(freqs)))
     for sensor_idx in range(n_sensors):
         data = batch.resps[:, sensor_idx]
-        frequency_responses[sensor_idx, :] = torch.fft.fft(data)
+        frequency_responses[sensor_idx, :] = torch.abs(torch.fft.fft(data))
 
     return EEGFrequencies(freqs, frequency_responses)

@@ -55,6 +55,8 @@ class EEGDataset:
             end_idx = len(self.datapoints)
 
         for i in range(start_idx, end_idx, stride):
+            if i + size > len(self.datapoints):
+                return
             yield self.batch(i, i + size)
 
     def select(self, criteria: Callable[[EEGDatapoint], bool]) -> "EEGDataset":

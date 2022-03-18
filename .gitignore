@@ -1,3 +1,6 @@
 .idea/
 data/**
 !data/README.md
+
+#*.pyc
+out/

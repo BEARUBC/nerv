@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-import random
-from typing import ClassVar, List, Set
+from typing import ClassVar, List, Set, Optional, Generator
 
 import pandas as pd
 import torch
@@ -15,51 +14,48 @@ class GraspAndLiftDatapoint(EEGDatapoint):
     """
     Datapoint selecting specific values
     """
-
-    subject: int
-    series: int
     idx: int
-    _sensor_ids: ClassVar[List[str]] = ["Fp1", "Fp2"]
-    _label_ids: ClassVar[List[str]] = ["HandStart", "FirstDigitTouch", "BothStartLoadPhase", "LiftOff", "Replace",
+    SENSOR_IDs: ClassVar[List[str]] = ["Fp1", "Fp2"]
+    LABEL_IDs: ClassVar[List[str]] = ["HandStart", "FirstDigitTouch", "BothStartLoadPhase", "LiftOff", "Replace",
                                        "BothReleased"]
 
     @classmethod
     def from_row(cls, row: pd.Series):
-        subj = row["subject"]
-        ser = row["series"]
         i = row["idx"]
-        d = torch.tensor([row[x] for x in GraspAndLiftDatapoint._sensor_ids])
-        label = torch.tensor([row[x] for x in GraspAndLiftDatapoint._label_ids])
-        return cls(data=d, label=label, subject=subj, series=ser, idx=i)
+        d = torch.tensor([row[x] for x in GraspAndLiftDatapoint.SENSOR_IDs])
+        label = torch.tensor([row[x] for x in GraspAndLiftDatapoint.LABEL_IDs])
+        return cls(resp=d, label=label, idx=i)
 
 
 @dataclass
 class GraspAndLiftDataset(EEGDataset):
-    subjects: Set[int]
-    series: Set[int]
+    subject: int
+    series: int
+
+    # 500Hz according to https://www.kaggle.com/c/grasp-and-lift-eeg-detection/data
+    sampling_rate: ClassVar[float] = 1 / 500
 
     @classmethod
-    def from_dataframe(cls, df: pd.DataFrame, subjects: Set[int] = None, series: Set[int] = None):
+    def from_dataframe(cls, df: pd.DataFrame, subject: int = None, series: int = None):
         datapoints = [GraspAndLiftDatapoint.from_row(df.iloc[i]) for i in range(len(df.index))]
-        return cls(datapoints, subjects, series)
+        return cls(datapoints, subject, series)
 
 
 class GraspAndLiftLoader(EEGDataLoader):
-    def load(self, path: Path, **kwargs) -> GraspAndLiftDataset:
-        """
+    def __init__(self, subjects: Set[int] = None, series: Set[int] = None):
+        self.subjects: Optional[Set[int]] = subjects
+        self.series: Optional[Set[int]] = series
 
+    def load(self, path: Path, **kwargs) -> Generator[GraspAndLiftDataset, None, None]:
+        """
         :param path:
         :param kwargs: Arguments specific to this data loader:
             - set: DatasetType, used to specify which dataset to load from the grasp and lift eeg dataset.
                 There is no validation set in this dataset, so VALID will produce an error.
 
-            - n_rows: Number of rows to sample from each dataset
-
-            - subjects: Set[int], list of subjects to load
-            - series: Set[int], list of series to load for each loaded subject
+            - n_rows: (Optional) Number of rows to sample from each dataset
         """
         kwargs.setdefault("set", DatasetType.TRAIN)
-        kwargs.setdefault("n_rows", 10000)
 
         subdir = path
 
@@ -72,7 +68,6 @@ class GraspAndLiftLoader(EEGDataLoader):
 
         assert subdir.exists(), "Subdirectory {0} does not exist".format(subdir.resolve())
 
-        out_dfs = []
         for x in subdir.iterdir():
             name_comps = x.stem.split("_")
 
@@ -82,14 +77,12 @@ class GraspAndLiftLoader(EEGDataLoader):
             assert name_comps[-1] == "data"
 
             subj = int(name_comps[0][4:])
-            if kwargs.get("subjects"):
-                if subj not in kwargs.get("subjects"):
-                    continue
+            if self.subjects and subj not in self.subjects:
+                continue
 
             series = int(name_comps[1][6:])
-            if kwargs.get("series"):
-                if series not in kwargs.get("series"):
-                    continue
+            if self.series and series not in self.series:
+                continue
 
             data_df = pd.read_csv(str(x), nrows=kwargs.get("n_rows"))
             # Read corresponding events csv
@@ -100,8 +93,5 @@ class GraspAndLiftLoader(EEGDataLoader):
             data_df = data_df.merge(events_df, on="id")
             data_df["idx"] = data_df["id"].map(lambda a: a.split("_")[-1])
             data_df.drop(columns=["id"], inplace=True)
-            data_df["subject"] = subj
-            data_df["series"] = series
 
-            out_dfs.append(data_df)
-        return GraspAndLiftDataset.from_dataframe(pd.concat(out_dfs), kwargs.get("subjects"), kwargs.get("series"))
+            yield GraspAndLiftDataset.from_dataframe(data_df, subj, series)

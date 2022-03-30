@@ -12,11 +12,21 @@ class DatasetType(Enum):
     VALID = auto()
     TEST = auto()
 
+@dataclass
+class EEGDelta:
+    resp_delta: torch.tensor
+    label: torch.tensor
+
+    
 
 @dataclass
 class EEGDatapoint(ABC):
     resp: torch.tensor
     label: torch.tensor
+
+    def __sub__(self, other:'EEGDatapoint'):
+        return EEGDelta(self.resp - other.resp, self.label)
+
 
 
 @dataclass

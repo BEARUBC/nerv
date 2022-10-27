@@ -59,6 +59,6 @@ data = np.moveaxis(X, 0, 2)
 tmin = 0
 epochs = mne.EpochsArray(data, info, events, tmin, event_id)
 
-# Analysis
+# MNE Analysis with plots
 epochs.average().plot()
 epochs.plot_psd()

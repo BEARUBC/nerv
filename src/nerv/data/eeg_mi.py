@@ -59,6 +59,20 @@ data = np.moveaxis(X, 0, 2)
 tmin = 0
 epochs = mne.EpochsArray(data, info, events, tmin, event_id)
 
-# MNE Analysis with plots
+# MNE analysis with epochs plots
 epochs.average().plot()
 epochs.plot_psd()
+
+# MNE analysis with evoked objects
+evoked_left = epochs['Left_Hand'].average()
+evoked_right = epochs['Right_Hand'].average()
+evokeds = dict(Left=evoked_left, Right=evoked_right)
+picks1 = 'C3'
+mne.viz.plot_compare_evokeds(evokeds, picks=picks1, legend=True)
+
+picks2 = 'C4'
+mne.viz.plot_compare_evokeds(evokeds, picks=picks2, legend=True)
+
+start_times = [0.45, 1.25, 2.05, 2.85]
+averages = [0.15, 0.25, 0.25, 0.25]
+evoked_left.plot_topomap(times=start_times, average=averages, ch_type='eeg')

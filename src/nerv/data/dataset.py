@@ -1,8 +1,8 @@
-from abc import ABC
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import List, Generator, Callable
+from typing import Generator, Callable
 
+import mne
 import torch
 
 
@@ -14,21 +14,21 @@ class DatasetType(Enum):
 
 
 @dataclass
-class EEGDatapoint(ABC):
-    resp: torch.tensor
-    label: torch.tensor
+class EEGDatapoint:
+    resp: torch.tensor  # EEG data, one row
+    label: torch.tensor  # Action Label / MI label
 
 
 @dataclass
-class EEGBatch(ABC):
+class EEGBatch:
     resps: torch.tensor
     labels: torch.tensor
 
 
-
 @dataclass
 class EEGDataset:
-    datapoints: List[EEGDatapoint]
+    dataset: mne.EpochsArray
+    sampling_freq: float
 
     def batch(self, start_idx: int, end_idx: int) -> EEGBatch:
         """

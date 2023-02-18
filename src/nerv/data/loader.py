@@ -1,9 +1,9 @@
 from abc import abstractmethod, ABC
-from pathlib import Path
+
+from src.nerv.data.dataset import EEGDataset
 
 
 class EEGDataLoader(ABC):
-
     @abstractmethod
-    def load(self, path: Path, **kwargs):
+    def load(self, **kwargs) -> EEGDataset:
         pass

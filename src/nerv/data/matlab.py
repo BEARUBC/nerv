@@ -29,14 +29,17 @@ class MatlabLoader(EEGDataLoader):
         #   event_id ([dict]): [{1 :'pos', -1 : 'neg'} - class labels id]
         #   chan_names ([list]): [channel names in a list of strings]
 
-        sfreq = dataset['o']['sampFreq']
-        chan_names = dataset['o']['chnames'][0][0] # Need to cut out excess channel
+        sfreq = int(dataset['o']['sampFreq'][0][()][0][0])
+        raw_chan_names = dataset['o']['chnames'][0][0][()][:-1]  # Excess channel is cut out
+        chan_names = np.array([x[0][0] for x in raw_chan_names])
+
         info = mne.create_info(ch_names=chan_names.tolist(), sfreq=sfreq, ch_types='eeg')
         info.set_montage('standard_1020')
 
-        data = dataset['o']['data'][0][0]  # May need to cut this to onset time and 1500 ms after
+        data = np.array(dataset['o']['data'][()][0][0][:, :-1]).transpose()  # May need to cut this to onset time and
+        # 1500 ms after
         raw = mne.io.RawArray(data, info)
-        stim = dataset['o']['marker']
+        stim = dataset['o']['marker'][0][()][0]
         events = mne.find_events(data, stim)
 
         # Y = dataset['SMT']['y_dec'][0][0][0]
@@ -87,7 +90,7 @@ class MatlabLoader(EEGDataLoader):
                 _raw, _events, sfreq = self._load(file)
                 n_files += 1
                 if n_files == 1:
-                    raw =_raw
+                    raw = _raw
                     events = _events
                     continue
 
@@ -96,7 +99,7 @@ class MatlabLoader(EEGDataLoader):
             raw /= n_files
             dtst = mne.EpochsArray(raw, events, event_id=self.event_id, preload=True)
             # dtst = mne.EpochsArray(data, info, events, self.tmin, self.event_id)
-            return EEGDataset(dtst, sfreq) # sfreq is subject to change, not sure if this pipeline will work
+            return EEGDataset(dtst, sfreq)  # sfreq is subject to change, not sure if this pipeline will work
 
     def __init__(self):
         self.event_id = dict(Left_Hand=1, Right_Hand=2, Neutral=3)

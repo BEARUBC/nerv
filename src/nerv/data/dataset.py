@@ -28,7 +28,6 @@ class EEGBatch:
 @dataclass
 class EEGDataset:
     dataset: mne.EpochsArray
-    sampling_freq: float
 
     def batch(self, start_idx: int, end_idx: int) -> EEGBatch:
         """

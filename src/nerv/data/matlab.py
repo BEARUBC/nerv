@@ -30,17 +30,20 @@ class MatlabLoader(EEGDataLoader):
         #   chan_names ([list]): [channel names in a list of strings]
 
         sfreq = int(dataset['o']['sampFreq'][0][()][0][0])
-        raw_chan_names = dataset['o']['chnames'][0][0][()][:-1]  # Excess channel is cut out
-        chan_names = np.array([x[0][0] for x in raw_chan_names])
+        chan_names_raw = dataset['o']['chnames'][0][0][()][:-1]  # Excess channel is cut out
+        chan_names = np.array([x[0][0] for x in chan_names_raw])
 
         info = mne.create_info(ch_names=chan_names.tolist(), sfreq=sfreq, ch_types='eeg')
         info.set_montage('standard_1020')
 
-        data = np.array(dataset['o']['data'][()][0][0][:, :-1]).transpose()  # May need to cut this to onset time and
-        # 1500 ms after
+        data = np.array(dataset['o']['data'][()][0][0][:, :-1]).transpose()
+        # May need to cut this to onset time to 1500 ms after
         raw = mne.io.RawArray(data, info)
-        stim = dataset['o']['marker'][0][()][0]
-        events = mne.find_events(data, stim)
+        ids_raw = dataset['o']['marker'][0][0]
+        ids = np.array([x[0] for x in ids_raw])
+        samples = np.array([i for i in range(ids.shape[0])])
+        events = np.column_stack((samples, np.zeros(ids.shape[0], dtype=int), ids))
+        # Should test/find out the purpose of the second column
 
         # Y = dataset['SMT']['y_dec'][0][0][0]
         # labels = np.array(Y)
@@ -68,15 +71,15 @@ class MatlabLoader(EEGDataLoader):
         # X /= 10 ** 6
         # data = np.moveaxis(X, 0, 2)
 
-        return raw, events, sfreq
+        return raw, events
 
     def load(self, path: Path) -> EEGDataset:
         if path.is_file():
-            raw, events, sfreq = self._load(path)
+            raw, events = self._load(path)
             # dtst = mne.EpochsArray(data, info, events, self.event_id)
-            dtst = mne.EpochsArray(raw, events, event_id=self.event_id, preload=True)
+            dtst = mne.Epochs(raw, events, event_id=self.event_id)
             # not sure about start and end times or reject dict
-            return EEGDataset(dtst, sampling_freq=self.sfreq)
+            return EEGDataset(dtst)
         elif path.is_dir():
             files = path.glob("**/*")
             raw, events = None, None
@@ -87,7 +90,7 @@ class MatlabLoader(EEGDataLoader):
                 if not file.is_file():
                     continue
                 print("loading file ", file)
-                _raw, _events, sfreq = self._load(file)
+                _raw, _events = self._load(file)
                 n_files += 1
                 if n_files == 1:
                     raw = _raw
@@ -97,9 +100,10 @@ class MatlabLoader(EEGDataLoader):
                 raw += _raw
                 print(raw)
             raw /= n_files
-            dtst = mne.EpochsArray(raw, events, event_id=self.event_id, preload=True)
+            dtst = mne.Epochs(raw, events, event_id=self.event_id, preload=True)
+            # Not sure why preload is true
             # dtst = mne.EpochsArray(data, info, events, self.tmin, self.event_id)
-            return EEGDataset(dtst, sfreq)  # sfreq is subject to change, not sure if this pipeline will work
+            return EEGDataset(dtst)  # sfreq is subject to change, not sure if this pipeline will work
 
     def __init__(self):
-        self.event_id = dict(Left_Hand=1, Right_Hand=2, Neutral=3)
+        self.event_id = dict(Left_Hand=1, Right_Hand=2, Neutral=3, Session_Break=91, Experiment_End=92, Initial_Relaxation=99)
